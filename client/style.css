@@ -21,7 +21,6 @@
     min-height:100vh;
     -webkit-tap-highlight-color:transparent;
   }
-  /* ---------- ambient layers ---------- */
   .bg-grid{
     position:fixed; inset:-2px; z-index:0; pointer-events:none;
     background-image:
@@ -60,7 +59,6 @@
     88%{opacity:.5;}
     100%{transform:translateY(-110vh) translateX(var(--dx,20px)); opacity:0;}
   }
-  /* ---------- sound toggle ---------- */
   .sound-toggle{
     position:fixed; top:14px; right:16px; z-index:70;
     font-family:'VT323', monospace; font-size:22px; letter-spacing:1px;
@@ -72,7 +70,6 @@
   }
   .sound-toggle:hover{color:#eaffd2; border-color:rgba(139,240,60,.7); box-shadow:0 0 18px rgba(139,240,60,.35);}
   .sound-toggle.off{color:#6f7d63; border-color:rgba(120,120,110,.35); box-shadow:none;}
-  /* ---------- header ---------- */
   .app-header{
     position:relative; z-index:5; text-align:center;
     padding:22px 16px 6px;
@@ -108,7 +105,6 @@
     font-size:13.5px; line-height:1.7; color:#7f9c68; letter-spacing:.5px;
   }
   .intro b{color:#b6e488; font-weight:normal;}
-  /* ---------- stage / device ---------- */
   .stage{
     position:relative; z-index:4;
     display:flex; flex-direction:column; align-items:center; justify-content:flex-start;
@@ -143,7 +139,6 @@
   .device .screw::after{content:''; position:absolute; inset:4px 1px; background:#0a0b07; border-radius:2px; transform:rotate(35deg);}
   .screw.tl{top:12px; left:14px;} .screw.tr{top:12px; right:14px;}
   .screw.bl{bottom:12px; left:14px;} .screw.br{bottom:12px; right:14px;}
-  /* ---------- LCD ---------- */
   .lcd-wrap{position:relative; margin-bottom:18px;}
   .lcd{
     position:relative;
@@ -192,7 +187,6 @@
     font-family:inherit; font-size:16px; z-index:3; cursor:text;
   }
   .lcd-wrap:focus-within .lcd{box-shadow:inset 0 0 24px rgba(0,0,0,.9), inset 0 0 40px rgba(139,240,60,.16), 0 0 0 3px #3d4a2c, 0 0 22px rgba(139,240,60,.35);}
-  /* ---------- keyboard ---------- */
   .keyboard{
     display:flex; flex-direction:column; gap:8px;
     padding:16px 14px;
@@ -230,7 +224,6 @@
     font-weight:bold;
   }
   .key.green:active,.key.green.pressed{transform:translateY(3px); box-shadow:0 0 0 #356d12, 0 0 22px rgba(139,240,60,.6), inset 0 2px 5px rgba(0,0,0,.35);}
-  /* ---------- status row ---------- */
   .status-row{
     display:flex; align-items:center; justify-content:space-between; gap:14px;
     margin-top:16px; padding:0 6px; flex-wrap:wrap;
@@ -326,7 +319,6 @@
     /* In-flow above the header on narrow screens: never overlaps the pager. */
     .linkfloat{position:static; width:min(94vw,340px); margin:10px auto 0;}
   }
-  /* ---------- cards ---------- */
   .cards-layer{position:fixed; inset:0; z-index:50; pointer-events:none;}
   .card{
     position:absolute; width:min(80vw, 290px);

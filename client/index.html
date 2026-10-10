@@ -131,14 +131,12 @@ document.addEventListener('click', function(e) {
 (function(){
   'use strict';
 
-  /* ---------- shared state ---------- */
   var soundOn = true;          // remembered in JS variable
   var audioCtx = null;
   var MAXLEN = 160;
 
   var $ = function(id){ return document.getElementById(id); };
 
-  /* ---------- live clock ---------- */
   function pad(n){ return (n<10?'0':'')+n; }
   function tickClock(){
     var d = new Date();
@@ -183,7 +181,6 @@ document.addEventListener('click', function(e) {
     if(soundOn){ ensureAudio(); sfxKey(); }
   });
 
-  /* ---------- LCD mirror + input ---------- */
   var input = $('msgInput');
   var lcdText = $('lcdText');
   var lcdCounter = $('lcdCounter');
@@ -238,7 +235,6 @@ document.addEventListener('click', function(e) {
   }
   input.addEventListener('input', renderLCD);
 
-  /* ---------- keyboard ---------- */
   var LAYOUT = [
     ['Q','W','E','R','T','Y','U','I','O','P'],
     ['A','S','D','F','G','H','J','K','L'],
@@ -291,7 +287,6 @@ document.addEventListener('click', function(e) {
   brow.appendChild(delKey); brow.appendChild(spaceKey); brow.appendChild(txKey);
   keyboardEl.appendChild(brow);
 
-  /* ---------- physical keyboard sync ---------- */
   document.addEventListener('keydown', function(e){
     if(e.metaKey || e.ctrlKey || e.altKey) return;
     // Link terminal owns its interaction: its buttons must never leak
@@ -318,7 +313,6 @@ document.addEventListener('click', function(e) {
     }
   });
 
-  /* ---------- focus / status ---------- */
   var sledLink = $('sledLink');
   var sledTx = $('sledTx');
   $('lcdWrap').addEventListener('click', function(){ input.focus(); });
@@ -616,7 +610,6 @@ document.addEventListener('click', function(e) {
     });
   });
 
-  /* ---------- cards: spawn + typewriter ---------- */
   var cardsLayer = $('cardsLayer');
   var zTop = 100;
 
@@ -735,7 +728,6 @@ document.addEventListener('click', function(e) {
     return card;
   }
 
-  /* ---------- dragging (mouse + touch) ---------- */
   function makeDraggable(card){
     var dragging = false, pid = null, startX = 0, startY = 0, startLeft = 0, startTop = 0;
 
@@ -780,7 +772,6 @@ document.addEventListener('click', function(e) {
     card.addEventListener('lostpointercapture', endDrag);
   }
 
-  /* ---------- transmit ---------- */
   // Command priority: /clear → /connect CODE → malformed /connect → pending
   // gate → normal message. Commands are local: no slip, no WebSocket send.
   var pendingJoin = null; // invite code awaiting creator approval (local gate)
@@ -854,7 +845,6 @@ document.addEventListener('click', function(e) {
     }
   }
 
-  /* ---------- floating dust ---------- */
   (function makeDust(){
     var layer = $('dust');
     var n = window.innerWidth < 600 ? 16 : 30;
@@ -872,7 +862,6 @@ document.addEventListener('click', function(e) {
     }
   })();
 
-  /* ---------- keep cards on-screen on resize ---------- */
   window.addEventListener('resize', function(){
     var cards = cardsLayer.children;
     for(var i = 0; i < cards.length; i++){
