@@ -1,0 +1,47 @@
+name: Feature request
+description: Suggest an improvement to AFTERTONE.
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include private invite codes, message contents, encryption keys, tokens, or personal information.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: What limitation or user need does this address?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the change you would like.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Any other approaches you considered.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: impact
+    attributes:
+      label: Potential impact
+      options:
+        - User interface
+        - Messaging or pairing
+        - Privacy or security
+        - Accessibility
+        - Documentation
+        - Other
+    validations:
+      required: true

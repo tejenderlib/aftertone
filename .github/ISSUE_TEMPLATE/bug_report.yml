@@ -1,0 +1,65 @@
+name: Bug report
+description: Report a reproducible problem in AFTERTONE.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Never include private invite codes, message contents, encryption keys, tokens, or personal information.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Bug summary
+      description: Describe the problem clearly.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open AFTERTONE.
+        2. Pair two devices.
+        3. Reproduce the issue.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and version
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: Operating system and environment
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Sanitized logs
+      description: Remove secrets and personal data before posting.
+      render: text
+    validations:
+      required: false

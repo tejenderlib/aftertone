@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security and privacy
+    url: https://github.com/tejenderlib/aftertone/security
+    about: Check repository security options before publicly disclosing sensitive vulnerability details.
