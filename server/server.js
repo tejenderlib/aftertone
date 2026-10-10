@@ -29,7 +29,7 @@ const MIME = {
 
 function serveStatic(req, res) {
   let urlPath = decodeURIComponent(new URL(req.url, 'http://x').pathname);
-  // /connect/<code> serves the SAME MB-88 UI — no second page.
+  // /connect/<code> serves the SAME UI — no second page.
   // client/net.js reads the code from location.pathname and auto-joins.
   if (urlPath === '/' || urlPath === '/connect' || urlPath.startsWith('/connect/')) urlPath = '/index.html';
   const file = path.normalize(path.join(CLIENT_DIR, urlPath));
@@ -273,4 +273,4 @@ setInterval(() => {
   }
 }, 30000).unref();
 
-server.listen(PORT, () => console.log(`MB-88 server listening on http://localhost:${PORT} (conn-lifetime: server-authoritative expiry)`));
+server.listen(PORT, () => console.log(`AFTERTONE server listening on http://localhost:${PORT} (conn-lifetime: server-authoritative expiry)`));
