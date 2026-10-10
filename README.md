@@ -190,7 +190,7 @@ Tests run the real `server/server.js` as a child process and drive it over real 
 
 The application is deployed as a **Node.js Web Service on Render**.
 
-- **Live:** <https://fix-beeper-mb-88.onrender.com> (Render service URL; unchanged until the external service is renamed)
+- **Live:** <https://fix-beeper-mb-88.onrender.com> (Existing Render URL; service renamed to AFTERTONE)
 - **Health check:** `GET /health` → `{"ok":true}`
 
 The server reads `PORT` from the environment, falling back to `3000` for local development, and binds the wildcard address so it is reachable outside the container. WebSocket traffic is served over the same port as the UI and upgrades to `wss://` automatically on HTTPS.
