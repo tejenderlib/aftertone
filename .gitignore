@@ -37,3 +37,5 @@ Thumbs.db
 # Unrelated local scratch (not part of the app)
 notion/
 .serena/
+.agents/
+skills-lock.json
