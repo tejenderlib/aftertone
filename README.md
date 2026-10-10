@@ -1,4 +1,5 @@
 # AFTERTONE
+## v1.0.0
 
 **Two devices. One private line.**
 
@@ -35,6 +36,14 @@ The whole application is a single Node process: it serves the client, terminates
 | WebSocket communication | One socket per device, multiplexed over the same HTTP server as the UI |
 | Server-authoritative lifetimes | 30/60/120/160-minute connections, expiry swept and extended by the server |
 | On-device link bar | Pairing, invite link, and time remaining without leaving the terminal |
+| Command | Purpose |
+| --- | --- |
+| `npm ci` | Install dependencies |
+| `npm start` | Start the server on `PORT` (default `3000`) |
+| `npm test` | Run the full test suite |
+
+```sh
+PORT=8080 npm start
 
 ## Encryption architecture
 
@@ -208,15 +217,6 @@ npm start
 
 Open <http://localhost:3000> in **two browser windows**. Press `CREATE INVITE` on one, then either open the invite link in the other or type `/connect MB88-XXXX-XXXX` into the LCD and press TRANSMIT. Accept the request, type a message, and press TRANSMIT.
 
-| Command | Purpose |
-| --- | --- |
-| `npm ci` | Install dependencies |
-| `npm start` | Start the server on `PORT` (default `3000`) |
-| `npm test` | Run the full test suite |
-
-```sh
-PORT=8080 npm start
-```
 
 | Environment variable | Default | Purpose |
 | --- | --- | --- |
