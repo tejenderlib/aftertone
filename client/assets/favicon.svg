@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>Aftertone</title>
+  <rect width="64" height="64" rx="14" fill="#050b08"/>
+  <path d="M10 33h6l4-7 6 15 7-25 8 34 7-26 5 12 3-3h6"
+        fill="none" stroke="#7dffb3" stroke-width="4.5"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
