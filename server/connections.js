@@ -70,10 +70,6 @@ export function createConnectionStore() {
     return { ok: true, code, durationMin: dur };
   }
 
-  function getInvite(code) {
-    return invites.get(normalizeCode(code)) || null;
-  }
-
   function joinInvite(code, requesterId, isConnected) {
     code = normalizeCode(code);
     if (!CODE_RE.test(code)) return { ok: false, error: 'invalid-code-format' };
@@ -125,10 +121,6 @@ export function createConnectionStore() {
 
   function getPeer(clientId) {
     return links.get(clientId) || null;
-  }
-
-  function getLifetime(clientId) {
-    return lifetimes.get(clientId) || null;
   }
 
   // Live pair only: linked AND unexpired. Callers must treat anything else
@@ -238,19 +230,13 @@ export function createConnectionStore() {
 
   return {
     createInvite,
-    getInvite,
     joinInvite,
     acceptConnection,
     rejectConnection,
     extendConnection,
     getPeer,
-    getLifetime,
     isLive,
     sweepExpired,
     handleDisconnect,
-    // Exposed for tests only (same process); never sent to clients.
-    _invites: invites,
-    _links: links,
-    _lifetimes: lifetimes,
   };
 }

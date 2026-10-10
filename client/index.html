@@ -1,24 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<script>
-window.contextInfo = {"files":[],"materials":[],"crafts":[]};
-// 处理锚点链接跳转（srcDoc iframe 中锚点链接默认行为不正确）
-document.addEventListener('click', function(e) {
-  var anchor = e.target.closest('a');
-  if (anchor) {
-    var href = anchor.getAttribute('href');
-    if (href && href.startsWith('#')) {
-      e.preventDefault();
-      var targetId = href.slice(1);
-      var target = document.getElementById(targetId);
-      if (target) {
-        target.scrollIntoView({ behavior: 'smooth' });
-      }
-    }
-  }
-});
-</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AFTERTONE · Two devices. One private line.</title>
@@ -257,10 +239,6 @@ document.addEventListener('click', function(e) {
     el.classList.add('pressed');
     setTimeout(function(){ el.classList.remove('pressed'); }, 120);
   }
-  function noFocusSteal(el){
-    el.addEventListener('pointerdown', function(e){ e.preventDefault(); });
-  }
-
   LAYOUT.forEach(function(row){
     var r = document.createElement('div');
     r.className = 'keyrow';

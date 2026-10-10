@@ -410,7 +410,6 @@
       rawSend(msg);
       return Promise.resolve(true);
     },
-    reconnect: connect,
     // User-initiated teardown: close once and stay down so the server runs
     // its normal disconnect lifecycle (pair broken, invites reaped, peer
     // notified). No protocol change — the close itself is the signal.
