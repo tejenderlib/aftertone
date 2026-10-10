@@ -43,6 +43,14 @@
       <div class="linkterm-label">TIME LEFT</div>
       <div class="linkterm-time" id="timeLeft">--:--</div>
     </div>
+    <div class="linkterm-group" id="keyGroup" hidden>
+      <div class="linkterm-label">SESSION KEY — COMPARE BY VOICE OR IN PERSON</div>
+      <code class="linkterm-code" id="keyPrint"></code>
+      <div class="linkterm-label" id="keyState">UNVERIFIED</div>
+      <div class="linkterm-btns">
+        <button class="lkey green" id="btnVerify" type="button" hidden>[ VERIFY ]</button>
+      </div>
+    </div>
     <div class="linkterm-group" id="extendGroup" hidden>
       <div class="linkterm-label">EXTEND LINK</div>
       <div class="linkterm-btns">
@@ -313,6 +321,12 @@
   var btnInvite = $('btnInvite'), btnCopy = $('btnCopy'), btnAddTime = $('btnAddTime');
   var btnAccept = $('btnAccept'), btnReject = $('btnReject');
   var btnDisconnect = $('btnDisconnect'), btnClose = $('btnClose'), btnInfo = $('btnInfo');
+  var keyGroup = $('keyGroup'), keyPrint = $('keyPrint'), keyState = $('keyState');
+  var btnVerify = $('btnVerify');
+  // Verification is shown only through the keyState label: set to VERIFIED
+  // solely by the VERIFY button, reset whenever the session changes or ends.
+  // A matching display proves nothing until both humans compare over a
+  // separate channel.
   var myInvite = null, myInviteUrl = null, incomingCode = null, netRef = null;
   var details = true; // CLOSE hides detail UI only; the connection is untouched.
   var selDur = 60;
@@ -376,9 +390,24 @@
     showBtn(btnAddTime, false); showBtn(btnAccept, false); showBtn(btnReject, false);
     showBtn(btnClose, false); showBtn(btnInfo, true);
   }
+  // Fingerprint display lifecycle: every crypto-ready carries a fresh
+  // fingerprint and resets verification; every session end clears it all.
+  function clearKey() {
+    keyPrint.textContent = '';
+    keyState.textContent = 'UNVERIFIED';
+    showGroup(keyGroup, false);
+    showBtn(btnVerify, false);
+  }
+  function showKey(fp) {
+    // A new fingerprint is never pre-verified; the label always resets here.
+    keyPrint.textContent = fp;
+    keyState.textContent = 'UNVERIFIED — COMPARE WITH PEER';
+    showGroup(keyGroup, true);
+    showBtn(btnVerify, true);
+  }
   function uiOffline() {
     myInvite = null; myInviteUrl = null; incomingCode = null;
-    pendingJoin = null; clearNotice();
+    pendingJoin = null; clearNotice(); clearKey();
     details = true;
     setBar('LINK ● OFFLINE', false); setCode(null); setUrl(null);
     showGroup(durGroup, false); showGroup(timerGroup, false); showGroup(extendGroup, false);
@@ -547,6 +576,14 @@
     // Invite stays reusable (Phase 2 lifecycle) — show it again.
     if (myInvite) uiInviteReady(myInvite);
     else uiOffline();
+  });
+  // The only path to VERIFIED: an explicit human press, good for the
+  // currently displayed fingerprint only.
+  btnVerify.addEventListener('click', function () {
+    if (!keyPrint.textContent) return;
+    keyState.textContent = '✓ VERIFIED BY YOU — CLEAR IF KEYS CHANGE';
+    showBtn(btnVerify, false);
+    sfxKey();
   });
   // CLOSE hides the invite UI only. Connection, invite, timer all continue.
   btnClose.addEventListener('click', function () {
@@ -883,9 +920,14 @@
     net.on('connection-established', function () {
       try { net.state.pendingInviteCode = null; } catch (e) {}
       myInvite = null; myInviteUrl = null; // invite consumed — no longer "waiting"
-      pendingJoin = null; clearNotice(); // composer back to normal for messaging
+      pendingJoin = null; clearNotice(); clearKey(); // fresh session, no fingerprint yet
       uiConnected();
       sfxDeliver();
+    });
+    // A (re-)derived session key always arrives unverified: display it and
+    // drop any previous human verification. Display alone proves nothing.
+    net.on('crypto-ready', function (m) {
+      if (m && m.fingerprint) showKey(m.fingerprint);
     });
     net.on('connection-extended', function (m) {
       showGroup(extendGroup, false);
@@ -905,11 +947,13 @@
       // Treated exactly like a lost peer: link off, controls reset, no rejoin.
       try { net.state.pendingInviteCode = null; } catch (e) {}
       showGroup(timerGroup, false); showGroup(extendGroup, false);
+      clearKey();
       uiFlash('LINK ● PEER LOST', null);
     });
     net.on('connection-rejected', function () {
       try { net.state.pendingInviteCode = null; } catch (e) {}
       pendingJoin = null; refreshLed();
+      clearKey();
       showNotice('CONNECTION DENIED', 2600);
       uiFlash('LINK ● DENIED', null);
     });
@@ -917,11 +961,13 @@
       incomingCode = null;
       try { net.state.pendingInviteCode = null; } catch (e) {}
       pendingJoin = null; refreshLed();
+      clearKey();
       showNotice('REQUEST GONE', 2600);
       uiFlash('REQUEST GONE', myInvite ? { code: myInvite } : null);
     });
     net.on('peer-disconnected', function () {
       try { net.state.pendingInviteCode = null; } catch (e) {}
+      clearKey();
       uiFlash('LINK ● PEER LOST', null);
     });
     // B-side opened via /connect/<code>: show joining immediately.

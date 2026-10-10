@@ -235,3 +235,145 @@ describe('Phase 5 — client session teardown', () => {
     }
   });
 });
+
+describe('Phase 5 — session fingerprint verification', () => {
+  let srv;
+
+  before(async () => { srv = await startServer(); });
+  after(async () => { await srv.stop(); });
+
+  /** Pair a real net.js with a raw client; capture the crypto-ready payload. */
+  async function pairCapturing(net, attackerPub = null) {
+    await waitReady(net);
+    const code = await net.createInvite(60);
+    const raw = new Client(srv.wsUrl);
+    await raw.open();
+    const requested = once(net, 'connection-request');
+    await raw.sendAndWait({ type: 'join-invite', code }, 'connection-pending');
+    await requested;
+    const netPubForRaw = raw.waitFor('key-exchange');
+    const netReady = once(net, 'crypto-ready');
+    await net.acceptConnection(code);
+    const { publicKey: netPub } = await netPubForRaw;
+    const rawPair = await crypto.generateKeyPair();
+    const rawPub = await crypto.exportPublicKey(rawPair.publicKey);
+    // Honest path delivers rawPub; a substituting relay delivers attackerPub.
+    raw.send({ type: 'key-exchange', publicKey: attackerPub || rawPub });
+    const ready = await netReady;
+    const rawKey = await crypto.deriveSharedKey(
+      rawPair.privateKey, await crypto.importPublicKey(netPub));
+    return { net, raw, rawPair, rawPub, netPub, rawKey, ready, code };
+  }
+
+  test('honest paired clients show matching fingerprints', async () => {
+    const a = createNet(srv.port);
+    const b = createNet(srv.port);
+    try {
+      await waitReady(a.net);
+      await waitReady(b.net);
+      const code = await a.net.createInvite(60);
+      const readyA = once(a.net, 'crypto-ready');
+      const readyB = once(b.net, 'crypto-ready');
+      await b.net.joinInvite(code);
+      await a.net.acceptConnection(code);
+      const [{ fingerprint: fpA }, { fingerprint: fpB }] = await Promise.all([readyA, readyB]);
+      assert.match(fpA, /^[0-9a-f]{4}(-[0-9a-f]{4}){5}$/);
+      assert.equal(fpA, fpB);
+    } finally {
+      a.cleanup();
+      b.cleanup();
+    }
+  });
+
+  test('a substituted public key produces a different fingerprint — and reads traffic', async () => {
+    const ctx = createNet(srv.port);
+    try {
+      const atk = await crypto.generateKeyPair();
+      const atkPub = await crypto.exportPublicKey(atk.publicKey);
+      const { net, raw, netPub, rawPub, ready } =
+        await pairCapturing(ctx.net, atkPub);
+      const fpHonest = await crypto.fingerprint(netPub, rawPub);
+      assert.notEqual(ready.fingerprint, fpHonest,
+        'the victim must not show the fingerprint of the honest session');
+      // The substitution is a working session for the attacker: it decrypts
+      // victim-bound messages, which is exactly the MITM under test.
+      const atkKey = await crypto.deriveSharedKey(
+        atk.privateKey, await crypto.importPublicKey(netPub));
+      const heard = once(net, 'message');
+      raw.send(await envelope(atkKey, 'intercept me'));
+      assert.equal((await heard).text, 'intercept me');
+      raw.close();
+    } finally {
+      ctx.cleanup();
+    }
+  });
+
+  test('verification is never automatic', async () => {
+    const ctx = createNet(srv.port);
+    try {
+      const { net, raw, ready } = await pairCapturing(ctx.net);
+      assert.deepEqual(Object.keys(ready).sort(), ['fingerprint', 'ready']);
+      assert.equal(typeof net.verify, 'undefined', 'no verify API may exist to call itself');
+      assert.ok(await expectNoEvent(net, 'verified'),
+        'nothing may emit verification on the client’s behalf');
+      raw.close();
+    } finally {
+      ctx.cleanup();
+    }
+  });
+
+  test('re-keying emits a new fingerprint, invalidating previous verification', async () => {
+    const ctx = createNet(srv.port);
+    try {
+      const { net, raw, ready } = await pairCapturing(ctx.net);
+      const rekeyed = once(net, 'crypto-ready');
+      const fresh = await crypto.generateKeyPair();
+      raw.send({ type: 'key-exchange',
+                 publicKey: await crypto.exportPublicKey(fresh.publicKey) });
+      const fp2 = (await rekeyed).fingerprint;
+      assert.notEqual(fp2, ready.fingerprint,
+        'a replacement key must never keep displaying the old fingerprint');
+      raw.close();
+    } finally {
+      ctx.cleanup();
+    }
+  });
+
+  test('disconnect followed by re-pairing yields a fresh fingerprint', async () => {
+    const ctx = createNet(srv.port);
+    try {
+      const first = await pairCapturing(ctx.net);
+      const gone = once(ctx.net, 'peer-disconnected');
+      first.raw.close();
+      await gone;
+      const second = await pairCapturing(ctx.net);
+      assert.notEqual(second.ready.fingerprint, first.ready.fingerprint,
+        'no stale session state may survive teardown');
+      second.raw.close();
+    } finally {
+      ctx.cleanup();
+    }
+  });
+
+  test('a cancelled request never produces a fingerprint', async () => {
+    const ctx = createNet(srv.port);
+    try {
+      await waitReady(ctx.net);
+      const code = await ctx.net.createInvite(60);
+      const raw = new Client(srv.wsUrl);
+      await raw.open();
+      try {
+        const requested = once(ctx.net, 'connection-request');
+        await raw.sendAndWait({ type: 'join-invite', code }, 'connection-pending');
+        await requested;
+        await ctx.net.rejectConnection(code);
+        assert.ok(await expectNoEvent(ctx.net, 'crypto-ready'),
+          'no session, no key, no fingerprint');
+      } finally {
+        raw.close();
+      }
+    } finally {
+      ctx.cleanup();
+    }
+  });
+});

@@ -2,7 +2,7 @@
 // that the browser loads. There is no re-implementation here on purpose: a
 // duplicated copy of the crypto would pass even if the shipped file were
 // broken.
-import test from 'node:test';
+import test, { describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { crypto } from './helpers/e2ee.js';
 
@@ -98,4 +98,38 @@ test('two encryptions of the same text differ (fresh IV each time)', async () =>
   assert.notEqual(one.ciphertext, two.ciphertext, 'ciphertext must not repeat');
   assert.equal(await crypto.decrypt(bKey, one), 'SAME TEXT');
   assert.equal(await crypto.decrypt(bKey, two), 'SAME TEXT');
+});
+
+describe('session fingerprint', () => {
+  test('identical key pairs produce identical fingerprints regardless of order', async () => {
+    const a = await peer();
+    const b = await peer();
+    assert.equal(await crypto.fingerprint(a.publicKey, b.publicKey),
+                 await crypto.fingerprint(b.publicKey, a.publicKey));
+  });
+
+  test('changing either public key changes the fingerprint', async () => {
+    const a = await peer();
+    const b = await peer();
+    const c = await peer();
+    const base = await crypto.fingerprint(a.publicKey, b.publicKey);
+    assert.notEqual(await crypto.fingerprint(c.publicKey, b.publicKey), base);
+    assert.notEqual(await crypto.fingerprint(a.publicKey, c.publicKey), base);
+  });
+
+  test('fingerprint format is six short lowercase hex groups (96 bits)', async () => {
+    const a = await peer();
+    const b = await peer();
+    const fp = await crypto.fingerprint(a.publicKey, b.publicKey);
+    assert.match(fp, /^[0-9a-f]{4}(-[0-9a-f]{4}){5}$/);
+    assert.equal(fp.replace(/-/g, '').length, 24);
+  });
+
+  test('fingerprint rejects non-string inputs without touching crypto', async () => {
+    const a = await peer();
+    for (const bad of [null, undefined, 42, {}, '']) {
+      await assert.rejects(() => crypto.fingerprint(bad, a.publicKey), /invalid-public-key/);
+      await assert.rejects(() => crypto.fingerprint(a.publicKey, bad), /invalid-public-key/);
+    }
+  });
 });

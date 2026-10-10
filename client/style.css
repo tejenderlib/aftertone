@@ -262,6 +262,8 @@
     color:var(--glow); text-shadow:0 0 8px rgba(139,240,60,.6);
     margin-top:2px;
   }
+  /* Session fingerprints (six hex groups) wrap instead of overflowing the bar. */
+  #keyPrint{overflow-wrap:anywhere; line-height:1.5;}
   .linkterm-url{
     margin-top:2px; padding:4px 8px;
     font-family:'Share Tech Mono',monospace; font-size:11.5px; line-height:1.5;
