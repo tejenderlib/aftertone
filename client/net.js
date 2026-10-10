@@ -289,7 +289,7 @@
           settleAll('join', normalizeCode(msg.code), false, err);
           settleAll('reject', normalizeCode(msg.code), false, err);
           settleAll('accept', normalizeCode(msg.code), false, err);
-        } else if (msg.error === 'invalid-duration' || msg.error === 'not-connected' || msg.error === 'connection-expired') {
+        } else if (msg.error === 'invalid-duration' || msg.error === 'not-connected' || msg.error === 'connection-expired' || msg.error === 'too-many-invites') {
           settleAll('extend', null, false, new Error(msg.error));
           settleAll('create', null, false, new Error(msg.error));
         }

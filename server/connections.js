@@ -62,6 +62,16 @@ export function createConnectionStore() {
   function createInvite(creatorId, durationMin = 60) {
     const dur = normalizeDuration(durationMin);
     if (dur === null) return { ok: false, error: 'invalid-duration' };
+    // At most MAX_LIVE_INVITES live (AVAILABLE or PENDING) invites per
+    // connection. CONNECTED (used), expired, and disconnected invites are
+    // gone or excluded, so they free their slot. Returned-to-AVAILABLE
+    // invites (rejected, cancelled request) are still live and reusable,
+    // so they keep counting.
+    let live = 0;
+    for (const inv of invites.values()) {
+      if (inv.creatorId === creatorId && inv.status !== 'CONNECTED') live++;
+    }
+    if (live >= 5) return { ok: false, error: 'too-many-invites' };
     let code;
     do {
       code = generateInviteCode();

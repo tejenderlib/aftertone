@@ -28,7 +28,13 @@ const MIME = {
 };
 
 function serveStatic(req, res) {
-  let urlPath = decodeURIComponent(new URL(req.url, 'http://x').pathname);
+  let urlPath;
+  try {
+    urlPath = decodeURIComponent(new URL(req.url, 'http://x').pathname);
+  } catch {
+    res.writeHead(400).end('bad request');
+    return;
+  }
   // /connect/<code> serves the SAME UI — no second page.
   // client/net.js reads the code from location.pathname and auto-joins.
   if (urlPath === '/' || urlPath === '/connect' || urlPath.startsWith('/connect/')) urlPath = '/index.html';
@@ -57,6 +63,41 @@ const server = http.createServer((req, res) => {
 const wss = new WebSocketServer({ server, maxPayload: 4096 });
 const peers = new Map(); // clientId -> ws
 const store = createConnectionStore();
+
+// Resource-exhaustion guards (all env-configurable, production-safe defaults).
+// Invalid values fall back to the default — never to unlimited.
+function envInt(name, def) {
+  const n = Number(process.env[name]);
+  return Number.isInteger(n) && n > 0 ? n : def;
+}
+function envNum(name, def) {
+  const n = Number(process.env[name]);
+  return Number.isFinite(n) && n > 0 ? n : def;
+}
+const MAX_CONN = envInt('MB88_MAX_CONN', 2000);
+const RATE_BURST = envInt('MB88_RATE_BURST', 30);
+const RATE_PER_SEC = envNum('MB88_RATE_PER_SEC', 5);
+const JOIN_LIMIT = envInt('MB88_JOIN_LIMIT', 20);
+const JOIN_WINDOW_MS = 60000;
+
+// Per-connection limiter state. Entries exist only while the socket is open
+// and are deleted on close, so the maps stay bounded by live connections.
+const rateBuckets = new Map(); // clientId -> { tokens, last }
+const joinAttempts = new Map(); // clientId -> [timestamp, ...] (pruned, capped)
+
+function takeToken(clientId) {
+  const now = Date.now();
+  let b = rateBuckets.get(clientId);
+  if (!b) {
+    b = { tokens: RATE_BURST, last: now };
+    rateBuckets.set(clientId, b);
+  }
+  b.tokens = Math.min(RATE_BURST, b.tokens + ((now - b.last) / 1000) * RATE_PER_SEC);
+  b.last = now;
+  if (b.tokens < 1) return false;
+  b.tokens -= 1;
+  return true;
+}
 
 // Phase 5 bounds. An uncompressed P-256 point is 65 raw bytes -> 88 base64
 // chars, so MAX_B64 is generous headroom for a key that is well-formed.
@@ -88,6 +129,14 @@ function isConnected(clientId) {
 }
 
 wss.on('connection', (ws) => {
+  // Shed load before creating any state: no clientId welcome, no peers entry,
+  // no timers, no store touch — so a rejected socket cannot leak anything.
+  // (Note: the client auto-reconnects after a close; each retry is cheap and
+  // stateless, and succeeds once load drops below the cap.)
+  if (peers.size >= MAX_CONN) {
+    try { ws.close(1008, 'server busy'); } catch { /* already gone */ }
+    return;
+  }
   const clientId = crypto.randomUUID();
   peers.set(clientId, ws);
   ws._clientId = clientId;
@@ -106,6 +155,14 @@ wss.on('connection', (ws) => {
     }
     if (!msg || typeof msg.type !== 'string') {
       send(ws, { type: 'error', error: 'invalid-message' });
+      return;
+    }
+    // Token bucket runs after parsing, before dispatch: malformed frames get
+    // their cheap fixed rejection above, while everything reaching pairing,
+    // crypto-shape checks, and relay logic is rate-bounded. Rejection keeps
+    // the socket open — no close, no state change.
+    if (!takeToken(clientId)) {
+      send(ws, { type: 'error', error: 'rate-limited' });
       return;
     }
     // --- Phase 1 (unchanged) ---
@@ -128,6 +185,22 @@ wss.on('connection', (ws) => {
       return;
     }
     if (msg.type === 'join-invite') {
+      // Every join frame counts — failed or successful, well-formed or not.
+      // Uniform counting keeps the allowance predictable (legit clients use a
+      // handful of attempts) and denies oracle-probing dodges. The list is
+      // pruned to the window on each attempt and never grows past the limit.
+      const now = Date.now();
+      let attempts = joinAttempts.get(clientId);
+      if (!attempts) {
+        attempts = [];
+        joinAttempts.set(clientId, attempts);
+      }
+      while (attempts.length && now - attempts[0] >= JOIN_WINDOW_MS) attempts.shift();
+      if (attempts.length >= JOIN_LIMIT) {
+        send(ws, { type: 'error', error: 'rate-limited', code: normalizeCode(msg.code) });
+        return;
+      }
+      attempts.push(now);
       const code = normalizeCode(msg.code);
       const res = store.joinInvite(code, clientId, isConnected);
       if (!res.ok) {
@@ -245,6 +318,8 @@ wss.on('connection', (ws) => {
 
   ws.on('close', () => {
     peers.delete(clientId);
+    rateBuckets.delete(clientId);
+    joinAttempts.delete(clientId);
     const done = store.handleDisconnect(clientId);
     if (done.peerId) sendTo(done.peerId, { type: 'peer-disconnected' });
     if (done.cancelled) sendTo(done.cancelled.creatorId, { type: 'connection-cancelled', code: done.cancelled.code });
