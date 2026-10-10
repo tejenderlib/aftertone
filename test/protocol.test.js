@@ -6,7 +6,8 @@
 // production code is stubbed, mocked, or re-implemented.
 import { test, before, after, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { startServer, pair, Client, CODE_RE, probeUntilError } from './helpers/client.js';
+import { WebSocket } from 'ws';
+import { startServer, pair, Client, CODE_RE, probeUntilError, sleep } from './helpers/client.js';
 
 // Phase 5: `message` carries {iv, ciphertext}, never plaintext. This dummy
 // envelope is only used where a test asserts pairing or lifetime, not crypto —
@@ -76,6 +77,21 @@ describe('Phase 1 — transport', () => {
   test('rejects path traversal outside the client directory', async () => {
     const res = await fetch(`${srv.base}/../server/server.js`);
     assert.ok(res.status === 403 || res.status === 404, `got ${res.status}`);
+  });
+
+  test('a malformed percent-encoded path is rejected with 400 and the server survives', async () => {
+    // Own server: pre-fix this request kills the process, so it must not
+    // share the describe-level server with other tests.
+    const only = await startServer();
+    try {
+      const bad = await fetch(`${only.base}/%E0%A4%A`);
+      assert.equal(bad.status, 400);
+      const health = await fetch(`${only.base}/health`);
+      assert.equal(health.status, 200);
+      assert.deepEqual(await health.json(), { ok: true });
+    } finally {
+      await only.stop();
+    }
   });
 
   test('greets every new socket with welcome + clientId + serverTime', async () => {
@@ -410,6 +426,176 @@ describe('Phase 2 — invites and pairing', () => {
     assert.notEqual(idBefore, idAfter, 'a new socket is a new client');
     const err = await b.sendAndWait(ENVELOPE, 'error');
     assert.equal(err.error, 'not-connected', 'pair is broken by the disconnect');
+  });
+
+  test('a sixth live invite is rejected but the first five stay usable', async () => {
+    const c = await client();
+    const codes = [];
+    for (let i = 0; i < 5; i++) {
+      codes.push((await c.sendAndWait({ type: 'create-invite', durationMin: 30 }, 'invite-created')).code);
+    }
+    const err = await c.sendAndWait({ type: 'create-invite', durationMin: 30 }, 'error');
+    assert.equal(err.error, 'too-many-invites');
+    // The first five are unaffected and still joinable.
+    const d = await client();
+    const pending = await d.sendAndWait({ type: 'join-invite', code: codes[0] }, 'connection-pending');
+    assert.equal(pending.code, codes[0]);
+  });
+
+  test('a used invite frees its slot for a new invite', async () => {
+    const { a, b, code } = await pair(srv, { durationMin: 30 });
+    assert.ok(a); assert.ok(b);
+    const fresh = await a.sendAndWait({ type: 'create-invite', durationMin: 30 }, 'invite-created');
+    assert.match(fresh.code, CODE_RE);
+    assert.notEqual(fresh.code, code, 'the consumed code is not reissued as the new one');
+  });
+
+  test('used and expired invites free their slots', async () => {
+    // NOTE: only CONNECTED pairs are swept; an unused AVAILABLE invite never
+    // expires on its own (pre-existing lifecycle design, now bounded by the
+    // per-connection cap). Expiry frees a slot by reaping the used pair.
+    const short = await startServer({ env: { MB88_TEST_DURATIONS: '0.03' } });
+    const extra = [];
+    try {
+      const c = new Client(short.wsUrl);
+      await c.open();
+      extra.push(c);
+      const d = new Client(short.wsUrl);
+      await d.open();
+      extra.push(d);
+      const codes = [];
+      for (let i = 0; i < 5; i++) {
+        codes.push((await c.sendAndWait({ type: 'create-invite', durationMin: 0.03 }, 'invite-created')).code);
+      }
+      const err = await c.sendAndWait({ type: 'create-invite', durationMin: 0.03 }, 'error');
+      assert.equal(err.error, 'too-many-invites');
+      // Pair on the first code with a short lifetime, then wait it out.
+      await d.sendAndWait({ type: 'join-invite', code: codes[0] }, 'connection-pending');
+      await c.waitFor('connection-request');
+      const goneC = c.waitFor('connection-expired', { timeout: 10000 });
+      const goneD = d.waitFor('connection-expired', { timeout: 10000 });
+      await c.sendAndWait({ type: 'accept-connection', code: codes[0] }, 'connection-established');
+      await d.waitFor('connection-established');
+      await Promise.all([goneC, goneD]);
+      // The expired pair reaped ALL of the creator's invites (expirePair
+      // removes either member's invites by design): capacity fully recovered
+      // — five succeed, the sixth is rejected again.
+      for (let i = 0; i < 5; i++) {
+        await c.sendAndWait({ type: 'create-invite', durationMin: 0.03 }, 'invite-created');
+      }
+      const full = await c.sendAndWait({ type: 'create-invite', durationMin: 0.03 }, 'error');
+      assert.equal(full.error, 'too-many-invites');
+    } finally {
+      for (const c of extra) c.close();
+      await short.stop();
+    }
+  });
+
+  test('disconnected creators free their slots; cancelled requests stay live and reusable', async () => {
+    const c = await client();
+    const codes = [];
+    for (let i = 0; i < 5; i++) {
+      codes.push((await c.sendAndWait({ type: 'create-invite', durationMin: 30 }, 'invite-created')).code);
+    }
+    // A requester joins one code, then vanishes: the invite returns to
+    // AVAILABLE — still live and reusable, so the creator stays at its limit.
+    const d = await client();
+    await d.sendAndWait({ type: 'join-invite', code: codes[0] }, 'connection-pending');
+    await c.waitFor('connection-request');
+    d.close();
+    await c.waitFor('connection-cancelled');
+    const still = await c.sendAndWait({ type: 'create-invite', durationMin: 30 }, 'error');
+    assert.equal(still.error, 'too-many-invites');
+    const e = await client();
+    const reusable = await e.sendAndWait({ type: 'join-invite', code: codes[0] }, 'connection-pending');
+    assert.equal(reusable.code, codes[0]);
+    // The creator disconnecting reaps everything: the codes are simply gone.
+    c.close();
+    const g = await client();
+    const gone = await probeUntilError(g, { type: 'join-invite', code: codes[1] }, 'invite-not-found');
+    assert.equal(gone.error, 'invite-not-found');
+  });
+
+  test('message bursts are rate-limited but the connection stays usable', async () => {
+    const { a, b } = await pair(srv, { durationMin: 30 });
+    // 40 rapid frames against a 30-burst bucket: ~30 relay, ~10 limited.
+    // (50 would overdraw even the ~20 tokens refilled during the test.)
+    for (let i = 0; i < 40; i++) a.send(ENVELOPE);
+    await sleep(500);
+    const limited = a.log.filter((m) => m.type === 'error' && m.error === 'rate-limited').length;
+    assert.ok(limited >= 5, `expected a 40-message burst to be limited, saw ${limited}`);
+    // Still connected and usable: control frames answer...
+    const pong = await a.sendAndWait({ type: 'ping', echo: 'STILL-HERE' }, 'pong');
+    assert.equal(pong.echo, 'STILL-HERE');
+    // ...and after a generous refill one more message relays. Drain exactly
+    // what the burst relayed (40 minus limited) plus the new one — the pair
+    // handshake itself consumed a few burst tokens, so the relayed count is
+    // derived, not assumed.
+    await sleep(5000);
+    a.send(ENVELOPE);
+    const relayed = 40 - limited;
+    for (let i = 0; i < relayed + 1; i++) await b.waitFor('message', { timeout: 5000 });
+  });
+
+  test('join attempts are throttled but legitimate retries work', async () => {
+    const retry = await client();
+    const real = await retry.sendAndWait({ type: 'create-invite', durationMin: 30 }, 'invite-created');
+    const guesser = await client();
+    const seen = new Set();
+    for (let i = 0; i < 25; i++) {
+      const err = await guesser.sendAndWait({ type: 'join-invite', code: 'MB88-ZZZZ-ZZZZ' }, 'error');
+      seen.add(err.error);
+    }
+    assert.ok(seen.has('invite-not-found'), 'early guesses get the normal error');
+    assert.ok(seen.has('rate-limited'), 'a join flood must be throttled');
+    // A couple of typo retries, then the real code — well within allowance.
+    const joiner = await client();
+    for (const bad of ['MB88-AAAA-AAAA', 'MB88-BBBB-BBBB']) {
+      const err = await joiner.sendAndWait({ type: 'join-invite', code: bad }, 'error');
+      assert.equal(err.error, 'invite-not-found');
+    }
+    const pending = await joiner.sendAndWait({ type: 'join-invite', code: real.code }, 'connection-pending');
+    assert.equal(pending.code, real.code);
+  });
+
+  test('global cap rejects excess connections without leaking state', async () => {
+    const cap = await startServer({ env: { MB88_MAX_CONN: '2' } });
+    const open = [];
+    try {
+      const a = await new Client(cap.wsUrl).open();
+      open.push(a);
+      const b = await new Client(cap.wsUrl).open();
+      open.push(b);
+      await a.waitFor('welcome');
+      await b.waitFor('welcome');
+      const raw = new WebSocket(cap.wsUrl);
+      const outcome = await new Promise((resolve) => {
+        const seenTypes = [];
+        raw.on('message', (data) => {
+          try { seenTypes.push(JSON.parse(data.toString()).type); } catch { /* ignore */ }
+        });
+        raw.on('close', (code) => resolve({ code, seenTypes }));
+        setTimeout(() => resolve({ code: 'timeout', seenTypes }), 5000);
+      });
+      assert.equal(outcome.code, 1008);
+      assert.ok(!outcome.seenTypes.includes('welcome'), 'a rejected socket is never welcomed');
+      // No leak: the admitted pair still forms and relays over the same server,
+      // and the rejection notified nobody.
+      const code = (await a.sendAndWait({ type: 'create-invite' }, 'invite-created')).code;
+      const pending = b.sendAndWait({ type: 'join-invite', code }, 'connection-pending');
+      const request = a.waitFor('connection-request');
+      await Promise.all([pending, request]);
+      const established = a.sendAndWait({ type: 'accept-connection', code }, 'connection-established');
+      const establishedB = b.waitFor('connection-established');
+      await Promise.all([established, establishedB]);
+      a.send(ENVELOPE);
+      const relayed = await b.waitFor('message', { timeout: 5000 });
+      assert.equal(relayed.ciphertext, ENVELOPE.ciphertext);
+      assert.ok(await b.expectNone('peer-disconnected'), 'the rejection notified nobody');
+    } finally {
+      for (const c of open) c.close();
+      await cap.stop();
+    }
   });
 });
 
