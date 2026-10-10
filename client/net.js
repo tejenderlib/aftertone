@@ -14,7 +14,7 @@
 //   __beeperNet.on('peer-disconnected', fn)
 //   await __beeperNet.sendMessage(text)      -> encrypts locally, relays {iv,ciphertext}
 //   __beeperNet.on('message', fn)            -> {messageId, text, timestamp} (decrypted)
-//   __beeperNet.on('crypto-ready', fn)       -> {ready:true} once the session key exists
+//   __beeperNet.on('crypto-ready', fn)       -> {ready:true, fingerprint} once the session key exists
 //   __beeperNet.on('error', fn)             -> 'decrypt-failed' etc.
 //   __beeperNet.disconnect()                    -> close socket once, no redial
 // Expiry is server-authoritative; state.expiresAt is display-only.
@@ -52,12 +52,14 @@
   // session. Both live here and nowhere else — the private key is never
   // exported, never sent, and never touches the socket. resetSession() drops
   // all of it, so a new pairing can never inherit the previous key.
-  var session = { keyPair: null, peerPublicKey: null, key: null };
+  var session = { keyPair: null, peerPublicKey: null, key: null, ownPublicKey: null, fingerprint: null };
 
   function resetSession() {
     session.keyPair = null;
     session.peerPublicKey = null;
     session.key = null;
+    session.ownPublicKey = null;
+    session.fingerprint = null;
   }
 
   function on(evt, fn) {
@@ -156,6 +158,9 @@
       if (!state.peerId) return;
       session.keyPair = kp;
       return bc.exportPublicKey(kp.publicKey).then(function (pub) {
+        // Public value, kept only so the fingerprint can combine it with the
+        // peer's key later. Cleared with everything else by resetSession().
+        session.ownPublicKey = pub;
         rawSend({ type: 'key-exchange', publicKey: pub });
       });
     }).catch(function () {
@@ -172,12 +177,19 @@
       return;
     }
     var pair = session.keyPair;
-    bc.importPublicKey(msg.publicKey).then(function (peerKey) {
+    var peerPub = msg.publicKey;
+    bc.importPublicKey(peerPub).then(function (peerKey) {
       return bc.deriveSharedKey(pair.privateKey, peerKey).then(function (key) {
         if (session.keyPair !== pair) return; // session ended mid-derive
         session.peerPublicKey = peerKey;
         session.key = key;
-        emit('crypto-ready', { ready: true });
+        // Fingerprint last, under the same guard: an async digest must never
+        // publish — and the UI must never display — a superseded session.
+        return bc.fingerprint(session.ownPublicKey, peerPub).then(function (fp) {
+          if (session.keyPair !== pair) return; // replaced or torn down mid-compute
+          session.fingerprint = fp;
+          emit('crypto-ready', { ready: true, fingerprint: fp });
+        });
       });
     }).catch(function () {
       emit('error', { error: 'key-exchange-failed' });
