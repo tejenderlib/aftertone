@@ -1,9 +1,9 @@
 {
-  "name": "fix-beeper-mb88",
+  "name": "aftertone",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "FIX BEEPER MB-88 Message Typewriter — two-person real-time messaging (Phase 1: WS hello/ping only)",
+  "description": "AFTERTONE — retro-inspired, two-person real-time messaging terminal. Two devices. One private line.",
   "scripts": {
     "start": "node server/server.js",
     "test": "node --test test/"

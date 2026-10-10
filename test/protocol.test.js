@@ -43,12 +43,12 @@ describe('Phase 1 — transport', () => {
     assert.deepEqual(await res.json(), { ok: true });
   });
 
-  test('serves the MB-88 UI at / and at /connect/<code>', async () => {
+  test('serves the AFTERTONE UI at / and at /connect/<code>', async () => {
     for (const path of ['/', '/connect/MB88-ABCD-EFGH']) {
       const res = await fetch(`${srv.base}${path}`);
       assert.equal(res.status, 200, `expected 200 for ${path}`);
       assert.match(res.headers.get('content-type') || '', /text\/html/);
-      assert.match(await res.text(), /FIX BEEPER/);
+      assert.match(await res.text(), /AFTERTONE/);
     }
   });
 

@@ -1,8 +1,8 @@
-# FIX BEEPER MB-88
+# AFTERTONE
 
-**A retro two-person real-time messaging terminal inspired by classic pagers, beepers, and message typewriters.**
+**Two devices. One private line.**
 
-Two devices pair through a private invite code, then exchange pager-style messages in real time. Message content is encrypted on the device before it reaches the wire, so the relay only moves ciphertext it cannot read. No accounts, no message history, no third party in the message path.
+A retro-inspired, two-person real-time messaging terminal. Two devices pair through a private invite code, then exchange pager-style messages in real time on a phosphor-green CRT desk — outgoing slips on the right, incoming on the left. Message content is encrypted on the device before it reaches the wire, so the relay only moves ciphertext it cannot read. No accounts, no message history, no third party in the message path.
 
 > **Security note:** the encryption here is **not authenticated end-to-end encryption**. It defends message content against a passive or honest-but-curious relay, not against an active man-in-the-middle. See [Security limitations](#security-limitations).
 
@@ -13,7 +13,7 @@ https://github.com/user-attachments/assets/842fa8c9-7a77-4163-9903-fd25fa82e307
 
 ## Overview
 
-FIX BEEPER MB-88 is a two-person messaging terminal built around the interaction design of 1980s pagers and message typewriters.
+AFTERTONE is a two-person real-time messaging terminal built around the interaction design of 1980s pagers and message typewriters.
 
 One device creates a private invite code. The other joins with it. Once paired, each message prints as a paper slip on a phosphor-green CRT desk — outgoing slips on the right, incoming on the left, each stamped `✓ DELIVERED` or `← RECEIVED`. The interface is deliberately mechanical: a link bar instead of a console, typewriter keys instead of a settings panel, and a short fixed message length because pagers had no room for more.
 
@@ -148,7 +148,7 @@ Errors:
 ## Project structure
 
 ```
-fix-beeper-mb-88/
+aftertone/
 ├── client/                  Static client, served as-is
 │   ├── index.html           CRT terminal markup + UI logic
 │   ├── style.css            Phosphor theme, scanlines, responsive rules
@@ -164,7 +164,7 @@ fix-beeper-mb-88/
 │   ├── netclient.test.js    Client-side encrypt/decrypt and teardown
 │   └── helpers/             Server harness, crypto bridge, browser shim
 ├── media/
-│   └── mb88-demo.mp4        Promo video for the MB-88
+│   └── aftertone-demo.mp4   Promo video for AFTERTONE
 ├── package.json
 └── README.md
 ```
@@ -190,7 +190,7 @@ Tests run the real `server/server.js` as a child process and drive it over real 
 
 The application is deployed as a **Node.js Web Service on Render**.
 
-- **Live:** <https://fix-beeper-mb-88.onrender.com>
+- **Live:** <https://fix-beeper-mb-88.onrender.com> (Render service URL; unchanged until the external service is renamed)
 - **Health check:** `GET /health` → `{"ok":true}`
 
 The server reads `PORT` from the environment, falling back to `3000` for local development, and binds the wildcard address so it is reachable outside the container. WebSocket traffic is served over the same port as the UI and upgrades to `wss://` automatically on HTTPS.
@@ -200,8 +200,8 @@ The server reads `PORT` from the environment, falling back to `3000` for local d
 Requires Node.js 18 or newer.
 
 ```sh
-git clone https://github.com/tejenderlib/fix-beeper-mb-88.git
-cd fix-beeper-mb-88
+git clone https://github.com/tejenderlib/aftertone.git
+cd aftertone
 npm ci
 npm start
 ```

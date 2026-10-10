@@ -84,16 +84,12 @@
     border:1px solid rgba(139,240,60,.22);
     box-shadow:0 0 24px rgba(139,240,60,.12), inset 0 1px 0 rgba(255,255,255,.05);
   }
-  .moto-logo{width:34px; height:34px; color:#e7f7d4; filter:drop-shadow(0 0 6px rgba(139,240,60,.5));}
-  .moto-word{
+  .brand-mark{width:34px; height:34px; font-size:30px; line-height:1; color:#e7f7d4; filter:drop-shadow(0 0 6px rgba(139,240,60,.5));}
+  .brand-word{
     font-family:'VT323', monospace; font-size:34px; letter-spacing:5px; color:#eef7e2;
     text-shadow:0 0 10px rgba(139,240,60,.55), 0 0 26px rgba(139,240,60,.25);
   }
   .hdr-divider{width:1px; height:34px; background:rgba(139,240,60,.3);}
-  .fixbeeper{
-    font-family:'VT323', monospace; font-size:32px; letter-spacing:3px; color:var(--glow);
-    text-shadow:0 0 10px rgba(139,240,60,.6);
-  }
   .led{
     width:11px; height:11px; border-radius:50%; background:#ff2d1f;
     box-shadow:0 0 10px #ff2d1f, 0 0 20px rgba(255,45,31,.6);
@@ -427,8 +423,7 @@
   .card-del:hover{background:#571713; color:#ffd0c8; transform:scale(1.14);}
   @media (max-width:520px){
     .badge-row{gap:10px; padding:8px 14px;}
-    .moto-word{font-size:26px; letter-spacing:3px;}
-    .fixbeeper{font-size:24px;}
+    .brand-word{font-size:26px; letter-spacing:3px;}
     .clock{font-size:20px;}
     .subtitle{font-size:11px; letter-spacing:2px;}
     .device{padding:14px; border-radius:22px;}
